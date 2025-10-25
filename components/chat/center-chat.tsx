@@ -224,7 +224,7 @@ export function CenterChat() {
 
       {/* Composer */}
       <div className="border-t p-3 md:p-4 shrink-0 bg-gradient-to-t from-muted/30 to-transparent">
-        <div className="mx-auto flex items-end gap-2 rounded-2xl border border-muted bg-background/80 backdrop-blur px-3 py-2 shadow-md md:max-w-3xl">
+        <div className="mx-auto flex items-end gap-2 rounded-2xl border border-muted bg-background/80 backdrop-blur px-3 py-2 shadow md:max-w-3xl">
           <Button variant="ghost" size="icon" className="rounded-full text-muted-foreground hover:text-foreground">
             <Plus size={16} />
           </Button>
