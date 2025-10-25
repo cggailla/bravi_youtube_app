@@ -5,56 +5,120 @@
 @layer base {
   :root {
     --background: 0 0% 100%;
-    --foreground: 0 0% 3.9%;
+    /* Clean white */
+    --foreground: 220 10% 25%;
+    /* Dark, slightly cool slate gray */
+
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 3.9%;
+    --card-foreground: 220 10% 25%;
+
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 3.9%;
-    --primary: 0 0% 9%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 96.1%;
-    --secondary-foreground: 0 0% 9%;
-    --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 45.1%;
-    --accent: 0 0% 96.1%;
-    --accent-foreground: 0 0% 9%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --ring: 0 0% 3.9%;
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
+    --popover-foreground: 220 10% 25%;
+
+    /* --- Primary: Shifted to a sophisticated stone/gray --- */
+    --primary: 215 15% 55%;
+    /* Medium stone gray */
+    --primary-foreground: 0 0% 100%;
+    /* White text on primary */
+
+    --secondary: 210 20% 96%;
+    /* Very light cool gray */
+    --secondary-foreground: 215 15% 40%;
+    /* Darker stone gray */
+
+    --muted: 210 20% 97%;
+    /* Lighter cool gray */
+    --muted-foreground: 215 10% 60%;
+    /* Lighter gray for muted text */
+
+    /* --- Accent: A subtle, earthy green --- */
+    --accent: 150 15% 94%;
+    /* Very light, desaturated green */
+    --accent-foreground: 150 25% 25%;
+    /* Dark, muted olive */
+
+    --destructive: 0 60% 70%;
+    /* Muted red, slightly lighter */
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 210 15% 90%;
+    /* Light gray border */
+    --input: 210 15% 90%;
+    --ring: 215 15% 65%;
+    /* Slightly lighter stone gray for focus */
+
     --radius: 0.5rem;
+
+    /* Optional Chart Colors (Neutral Palette) */
+    --chart-1: 215 15% 60%;
+    /* Primary Gray variant */
+    --chart-2: 150 20% 55%;
+    /* Muted Olive/Green */
+    --chart-3: 30 40% 70%;
+    /* Soft Beige/Tan */
+    --chart-4: 200 15% 65%;
+    /* Soft Slate Blue/Gray */
+    --chart-5: 0 0% 50%;
+    /* Medium Gray */
   }
+
   .dark {
-    --background: 0 0% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 14.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 14.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
+    --background: 220 15% 10%;
+    /* Very dark cool slate */
+    --foreground: 210 15% 92%;
+    /* Light gray */
+
+    --card: 220 15% 13%;
+    /* Slightly lighter dark slate */
+    --card-foreground: 210 15% 92%;
+
+    --popover: 220 15% 12%;
+    /* Darker popover */
+    --popover-foreground: 210 15% 92%;
+
+    /* --- Primary: Dark theme stone/gray --- */
+    --primary: 215 10% 75%;
+    /* Lighter stone gray for contrast */
+    --primary-foreground: 220 20% 15%;
+    /* Very dark text on primary */
+
+    --secondary: 220 10% 25%;
+    /* Darker muted slate */
+    --secondary-foreground: 210 10% 80%;
+    /* Lighter gray */
+
+    --muted: 220 10% 22%;
+    /* Slightly darker muted */
+    --muted-foreground: 210 10% 60%;
+    /* Medium-dark gray */
+
+    /* --- Accent: Muted dark green --- */
+    --accent: 150 20% 28%;
+    /* Dark, muted olive/green */
+    --accent-foreground: 150 15% 85%;
+    /* Light green/gray text */
+
+    --destructive: 0 50% 50%;
+    /* Darker, less saturated red */
+    --destructive-foreground: 0 0% 95%;
+
+    --border: 220 10% 30%;
+    /* Dark border */
+    --input: 220 10% 30%;
+    --ring: 215 10% 80%;
+    /* Lighter stone gray focus ring */
+
+    /* Optional Chart Colors (Neutral Dark Palette) */
+    --chart-1: 215 10% 70%;
+    /* Primary Gray variant */
+    --chart-2: 150 25% 45%;
+    /* Muted Olive/Green */
+    --chart-3: 30 30% 55%;
+    /* Muted Tan/Brown */
+    --chart-4: 200 20% 50%;
+    /* Muted Slate Blue/Gray */
+    --chart-5: 0 0% 65%;
+    /* Light Gray */
   }
 }
 
@@ -62,6 +126,7 @@
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground;
   }
