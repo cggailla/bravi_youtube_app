@@ -1,0 +1,90 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  // On remet le generator à la sortie par défaut, c'est plus propre.
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+}
+
+// 1. Modèle Utilisateur
+// On le nomme "User" (majuscule) mais on le lie à "users" (minuscule)
+model User {
+  id            String         @id @default(uuid())
+  email         String?        @unique
+  name          String?
+  avatarUrl     String?        @map("avatar_url")
+
+  // Relations
+  videos        Video[]
+  channels      Channel[]
+  conversations Conversation[]
+
+  @@map("users") // Important: Lie ce modèle à la table 'users' de Supabase
+}
+
+// 2. Modèle Chaîne YouTube
+model Channel {
+  id        String   @id @default(cuid())
+  youtubeId String   @unique @map("youtube_id")
+  name      String
+  
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  videos    Video[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt // On ajoute @updatedAt
+}
+
+// 3. Modèle Vidéo YouTube
+model Video {
+  id            String   @id @default(cuid())
+  youtubeId     String   @unique @map("youtube_id")
+  title         String
+  thumbnailUrl  String?  @map("thumbnail_url")
+  
+  status        String   @default("QUEUED")
+  errorMessage  String?  @map("error_message")
+
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  channelId     String?
+  channel       Channel? @relation(fields: [channelId], references: [id])
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt // On ajoute @updatedAt
+}
+
+// 4. Modèle Conversation
+model Conversation {
+  id        String    @id @default(cuid())
+  title     String    @default("New Chat")
+  scope     String[]
+  
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  messages  Message[]
+  
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt // On ajoute @updatedAt
+}
+
+// 5. Modèle Message
+model Message {
+  id             String       @id @default(cuid())
+  role           String       
+  content        String       @db.Text // @db.Text pour du contenu long
+  
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  
+  createdAt      DateTime     @default(now())
+}
