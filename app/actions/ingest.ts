@@ -83,49 +83,84 @@ export async function addYoutubeContent(
     return { message: "Could not extract video ID", error: true };
   }
 
-  // 4. *** NEW: Verify user exists from Prisma's perspective ***
-  try {
-    const prismaUser = await prisma.user.findUnique({
-      where: { id: user.id },
-    });
-    if (!prismaUser) {
-      console.error(`[Server Action] CRITICAL: Prisma cannot find user ${user.id} in auth.users right before create!`);
-      // This indicates a deeper issue, potentially DB replication lag or schema mismatch despite checks.
-      return { message: "Internal error: User reference mismatch", error: true };
-    } else {
-      console.log(`[Server Action] Prisma successfully found user ${user.id} in auth.users.`);
+  // ---- 4. Launch concurrent async operations ----
+  const youtubeApiPromise = (async () => {
+    let title = null;
+    let channelName = null;
+    let thumbnailUrl = null;
+    let duration = null;
+
+    try {
+      const apiKey = process.env.YOUTUBE_API_KEY;
+      if (!apiKey) {
+        console.warn("[YouTube API] No API key found, skipping metadata fetch");
+        return { title, channelName, thumbnailUrl, duration };
+      }
+
+      const apiUrl = `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails&id=${youtubeId}&key=${apiKey}`;
+      const res = await fetch(apiUrl);
+      const json = await res.json();
+
+      if (json.items && json.items.length > 0) {
+        const item = json.items[0];
+        title = item.snippet.title;
+        channelName = item.snippet.channelTitle;
+        thumbnailUrl = item.snippet.thumbnails?.high?.url;
+        duration = item.contentDetails.duration; // "PT9M5S" format
+      } else {
+        console.warn("[YouTube API] No data found for", youtubeId);
+      }
+    } catch (err) {
+      console.error("[YouTube API] Error fetching metadata:", err);
     }
-  } catch (findError) {
-    console.error("[Server Action] Error querying auth.users with Prisma:", findError);
-    return { message: "Internal error: Cannot verify user reference", error: true };
-  }
-  // --- END NEW CHECK ---
 
-  // Introspect DB constraints to detect unexpected FK remnants
-  try {
-    const fkRows = await prisma.$queryRaw<any[]>`
-      SELECT conname, conrelid::regclass as table
-      FROM pg_constraint
-      WHERE contype = 'f' AND conname ILIKE 'video_userid_fkey'
-    `;
-    console.log("[Server Action] Constraint check (video_userid_fkey):", fkRows);
-  } catch (e) {
-    console.warn("[Server Action] Constraint check failed:", e);
+    // Convert ISO 8601 duration -> seconds
+    const parseISO8601Duration = (iso: string): number => {
+      const match = iso?.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+      if (!match) return 0;
+      const [, h, m, s] = match.map((x) => parseInt(x || "0", 10));
+      return h * 3600 + m * 60 + s;
+    };
+    const durationSeconds = duration ? parseISO8601Duration(duration) : null;
+
+    return { title, channelName, thumbnailUrl, durationSeconds };
+  })();
+
+  const prismaUserPromise = (async () => {
+    try {
+      const prismaUser = await prisma.user.findUnique({
+        where: { id: user.id },
+      });
+      if (!prismaUser) {
+        throw new Error(`User ${user.id} not found in auth.users`);
+      }
+      return prismaUser;
+    } catch (err) {
+      console.error("[Server Action] Error verifying Prisma user:", err);
+      throw new Error("Internal error: Cannot verify user reference");
+    }
+  })();
+
+  // ---- 5. Await both async tasks ----
+  const [youtubeData, prismaUser] = await Promise.allSettled([
+    youtubeApiPromise,
+    prismaUserPromise,
+  ]);
+
+  if (prismaUser.status === "rejected") {
+    return { message: prismaUser.reason?.message ?? "User verification failed", error: true };
   }
 
-  try {
-    const tableInfo = await prisma.$queryRaw<any[]>`
-      SELECT column_name, data_type
-      FROM information_schema.columns
-      WHERE table_schema = 'public' AND table_name = 'Video'
-    `;
-    console.log("[Server Action] public.Video columns:", tableInfo);
-  } catch (e) {
-    console.warn("[Server Action] Describe table failed:", e);
-  }
+  const videoMeta: {
+    title?: string | null;
+    channelName?: string | null;
+    thumbnailUrl?: string | null;
+    durationSeconds?: number | null;
+  } = youtubeData.status === "fulfilled" ? youtubeData.value : {};
 
-  // Persist to DB
-  console.log("[Server Action] Tentative d'ingestion pour userId:", user.id);
+  console.log("[Server Action] YouTube metadata resolved:", videoMeta);
+
+  // ---- 6. Persist to DB ----
   let newVideo;
   try {
     newVideo = await prisma.video.create({
@@ -133,23 +168,25 @@ export async function addYoutubeContent(
         youtubeId,
         userId: user.id,
         status: "QUEUED",
-        title: `YouTube ${youtubeId}`,
+        title: videoMeta.title || `YouTube ${youtubeId}`,
+        channelName: videoMeta.channelName || null,
+        thumbnailUrl: videoMeta.thumbnailUrl || null,
+        duration: videoMeta.durationSeconds || null,
       },
     });
-    console.log("[Server Action] prisma.video.create OK:", { id: newVideo.id, youtubeId: newVideo.youtubeId });
+    console.log("[Server Action] prisma.video.create OK:", {
+      id: newVideo.id,
+      youtubeId: newVideo.youtubeId,
+    });
   } catch (err) {
-    // Improve feedback for common cases and log details server-side
     console.error("Prisma create(video) failed:", err);
     if (err instanceof Prisma.PrismaClientKnownRequestError) {
-      if (err.code === "P2002") {
-        return { message: "Video already queued.", error: true };
-      }
-      if (err.code === "P2003") {
-        console.error("[Server Action] P2003 Foreign key error details:", (err as any).meta);
-      }
+      if (err.code === "P2002") return { message: "Video already queued.", error: true };
+      if (err.code === "P2003") console.error("[Server Action] P2003 Foreign key error:", (err as any).meta);
     }
     return { message: "Database error", error: true };
   }
+
 
   // Trigger ingestion via Inngest
   try {
