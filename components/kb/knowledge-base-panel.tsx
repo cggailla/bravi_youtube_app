@@ -1,6 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useState } from "react";
+import { useFormStatus } from "react-dom";
+import { addYoutubeContent } from "@/app/actions/ingest";
 import Image from "next/image";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -17,6 +19,22 @@ import {
   RefreshCcw,
   Search,
 } from "lucide-react";
+
+function IngestSubmitButton({ disabled }: { disabled: boolean }) {
+  const { pending } = useFormStatus();
+  return (
+    <Button type="submit" disabled={disabled || pending} className="rounded-full shadow">
+      {pending ? "Ingesting..." : "Ingest"}
+    </Button>
+  );
+}
+
+function FormFeedback({ message }: { message?: string }) {
+  const { pending } = useFormStatus();
+  if (pending) return <p className="text-sm text-primary/100">Adding video to queue...</p>;
+  if (message) return <p className="text-sm text-primary/100">{message}</p>;
+  return null;
+}
 
 type Status = "queued" | "processing" | "ready" | "failed";
 
@@ -120,6 +138,16 @@ export default function KnowledgeBasePanel() {
   const [selected, setSelected] = useState<string[]>([]);
   const [pasteValue, setPasteValue] = useState("");
 
+  // Server Action wiring with useActionState
+  type FormState = { message: string; error?: boolean };
+  const initialFormState: FormState = { message: "" };
+  const [formState, formAction] = useActionState(addYoutubeContent, initialFormState);
+  useEffect(() => {
+    if (formState?.message) {
+      console.log("[KB][FormState]", formState);
+    }
+  }, [formState]);
+
   const filteredVideos = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return dummyVideos;
@@ -175,26 +203,23 @@ export default function KnowledgeBasePanel() {
     console.log("Retry ingestion", video.id);
   }
 
-  function handleIngest() {
-    // TODO: Detect URL type (video vs channel) and call server action
-    console.log("Ingest request", pasteValue);
-  }
-
   return (
     <div className="flex h-full flex-1 flex-col gap-4 overflow-hidden min-h-0">
       {/* Ingestion input */}
       <div className="rounded-3xl border border-primary/25 bg-primary/10 backdrop-blur-md p-5 shadow-lg">
-        <div className="flex items-center gap-3">
-          <Input
-            placeholder="Paste YouTube video or channel URL"
-            value={pasteValue}
-            onChange={(event) => setPasteValue(event.target.value)}
-            className="flex-1 bg-white text-foreground"
-          />
-          <Button onClick={handleIngest} disabled={!pasteValue.trim()} className="rounded-full shadow">
-            Ingest
-          </Button>
-        </div>
+        <form action={formAction} className="flex flex-col gap-2">
+          <div className="flex items-center gap-3">
+            <Input
+              name="url"
+              placeholder="Paste YouTube video or channel URL"
+              value={pasteValue}
+              onChange={(event) => setPasteValue(event.target.value)}
+              className="flex-1 bg-white text-foreground"
+            />
+            <IngestSubmitButton disabled={!pasteValue.trim()} />
+          </div>
+          <FormFeedback message={formState?.message} />
+        </form>
         <p className="mt-3 text-sm text-primary/100">
           Video URLs ingest a single video. Channel URLs ingest the latest 10 videos and queue them for processing.
         </p>
