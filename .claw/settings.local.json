@@ -1,0 +1,39 @@
+{
+  "permissions": {
+    "allow": [
+      "grep *",
+      "ls *",
+      "cat *",
+      "mkdir *",
+      "mv *",
+      "cp *",
+      "npm install",
+      "npx prisma generate",
+      "npx prisma db push"
+    ],
+    "deny": [
+      "rm *",
+      "sudo *",
+      "bash *",
+      "curl *",
+      "wget *"
+    ]
+  },
+  "tools": {
+    "web_fetch": {
+      "allow_domains": [
+        "www.prisma.io",
+        "supabase.com",
+        "www.inngest.com",
+        "zeroentropy.ai",
+        "sdk.vercel.ai",
+        "nextjs.org",
+        "tailwindcss.com",
+        "ui.shadcn.com"
+      ],
+      "cache_dir": ".claw/cache",
+      "max_tokens_per_cache": 1000,
+      "cache_ttl_days": 30
+    }
+  }
+}

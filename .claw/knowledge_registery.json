@@ -1,0 +1,27 @@
+{
+  "prisma": {
+    "docs": "https://www.prisma.io/docs",
+    "focus": ["orm/prisma-client", "concepts/components/relations", "orm/prisma-schema"],
+    "summary": "ORM TypeScript. Définition du schema, relations, génération de client."
+  },
+  "supabase": {
+    "docs": "https://supabase.com/docs",
+    "focus": ["guides/auth/server-side", "reference/javascript/auth-signin", "guides/realtime/quickstart"],
+    "summary": "Auth SSR, Postgres managé, Realtime par canaux."
+  },
+  "inngest": {
+    "docs": "https://www.inngest.com/docs",
+    "focus": ["functions", "events", "steps", "retries"],
+    "summary": "Workflows asynchrones avec steps reprenables et gestion des retries."
+  },
+  "zeroentropy": {
+    "docs": "https://zeroentropy.ai/docs",
+    "focus": ["embeddings", "vector-search", "metadata-filtering", "reranking"],
+    "summary": "Embeddings, recherche vectorielle, filtrage par metadata et rerank."
+  },
+  "vercel_ai_sdk": {
+    "docs": "https://sdk.vercel.ai/docs",
+    "focus": ["guides/nextjs", "responses/streaming", "tools"],
+    "summary": "Streaming des réponses IA pour Next.js via handlers dédiés."
+  }
+}
