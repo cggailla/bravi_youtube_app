@@ -436,8 +436,10 @@ model Message {
 model Video {
   id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   youtubeId    String    @unique @map("youtube_id")
-  title        String
+  title        String?   @map("title")
+  channelName  String?   @map("channel_name")
   thumbnailUrl String?   @map("thumbnail_url")
+  duration     Int?      @map("duration")
   status       String    @default("QUEUED")
   errorMessage String?   @map("error_message")
   userId       String    @map("user_id") @db.Uuid
