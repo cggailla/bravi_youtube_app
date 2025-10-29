@@ -1,109 +1,142 @@
-<a href="https://demo-nextjs-with-supabase.vercel.app/">
-  <img alt="Next.js and Supabase Starter Kit - the fastest way to build apps with Next.js and Supabase" src="https://demo-nextjs-with-supabase.vercel.app/opengraph-image.png">
-  <h1 align="center">Next.js and Supabase Starter Kit</h1>
-</a>
+# Bravi — YouTube Knowledge Base
 
-<p align="center">
- The fastest way to build apps with Next.js and Supabase
-</p>
+Bravi est une application qui indexe et rend consultable du contenu YouTube (métadonnées, transcriptions, embeddings) et fournit une interface réactive avec mises à jour en temps réel via Supabase.
 
-<p align="center">
-  <a href="#features"><strong>Features</strong></a> ·
-  <a href="#demo"><strong>Demo</strong></a> ·
-  <a href="#deploy-to-vercel"><strong>Deploy to Vercel</strong></a> ·
-  <a href="#clone-and-run-locally"><strong>Clone and run locally</strong></a> ·
-  <a href="#feedback-and-issues"><strong>Feedback and issues</strong></a>
-  <a href="#more-supabase-examples"><strong>More Examples</strong></a>
-</p>
-<br/>
+Ce README vise un utilisateur souhaitant installer l'app en local et comprendre rapidement ses choix techniques.
 
-## Features
+---
 
-- Works across the entire [Next.js](https://nextjs.org) stack
-  - App Router
-  - Pages Router
-  - Middleware
-  - Client
-  - Server
-  - It just works!
-- supabase-ssr. A package to configure Supabase Auth to use cookies
-- Password-based authentication block installed via the [Supabase UI Library](https://supabase.com/ui/docs/nextjs/password-based-auth)
-- Styling with [Tailwind CSS](https://tailwindcss.com)
-- Components with [shadcn/ui](https://ui.shadcn.com/)
-- Optional deployment with [Supabase Vercel Integration and Vercel deploy](#deploy-your-own)
-  - Environment variables automatically assigned to Vercel project
+## 1) Screenshots & GIFs
 
-## Demo
+Voici les layouts des deux pages majeurs de l'app : login
 
-You can view a fully working demo at [demo-nextjs-with-supabase.vercel.app](https://demo-nextjs-with-supabase.vercel.app/).
+```md
+![Login page](docs/screenshots/login-page.png)
+```
 
-## Deploy to Vercel
+et la page principale où se retrouve tout les services
+```md
+![Home page](docs/screenshots/home_page.png)
+```
 
-Vercel deployment will guide you through creating a Supabase account and project.
+---
 
-After installation of the Supabase integration, all relevant environment variables will be assigned to the project so the deployment is fully functioning.
+## 2) Setup (installer et lancer en local)
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fvercel%2Fnext.js%2Ftree%2Fcanary%2Fexamples%2Fwith-supabase&project-name=nextjs-with-supabase&repository-name=nextjs-with-supabase&demo-title=nextjs-with-supabase&demo-description=This+starter+configures+Supabase+Auth+to+use+cookies%2C+making+the+user%27s+session+available+throughout+the+entire+Next.js+app+-+Client+Components%2C+Server+Components%2C+Route+Handlers%2C+Server+Actions+and+Middleware.&demo-url=https%3A%2F%2Fdemo-nextjs-with-supabase.vercel.app%2F&external-id=https%3A%2F%2Fgithub.com%2Fvercel%2Fnext.js%2Ftree%2Fcanary%2Fexamples%2Fwith-supabase&demo-image=https%3A%2F%2Fdemo-nextjs-with-supabase.vercel.app%2Fopengraph-image.png)
+Prérequis
+- Node.js LTS (18+ recommandé)
+- npm
+- Postgres (local ou distant)
 
-The above will also clone the Starter kit to your GitHub, you can clone that locally and develop locally.
+Étapes (PowerShell)
 
-If you wish to just develop locally and not deploy to Vercel, [follow the steps below](#clone-and-run-locally).
+```powershell
+git clone https://github.com/cggailla/bravi_youtube_app.git
+cd bravi_youtube_app
+npm install
 
-## Clone and run locally
+# Créez .env.local (voir exemple ci-dessous)
+npx prisma generate
+npx prisma migrate dev --name init
+npm run dev
+```
 
-1. You'll first need a Supabase project which can be made [via the Supabase dashboard](https://database.new)
+Exemple minimal `.env.local` (NE PAS COMMIT)
 
-2. Create a Next.js app using the Supabase Starter template npx command
+```
+DATABASE_URL="postgresql://user:pass@localhost:5432/bravi"
+NEXT_PUBLIC_SUPABASE_URL="https://<project-ref>.supabase.co"
+NEXT_PUBLIC_SUPABASE_ANON_KEY="<anon-key>"
+SUPABASE_SERVICE_ROLE_KEY="<service-role-key>" # serveur seulement
+```
 
-   ```bash
-   npx create-next-app --example with-supabase with-supabase-app
-   ```
+Ouvrir http://localhost:3000
 
-   ```bash
-   yarn create next-app --example with-supabase with-supabase-app
-   ```
+Build production
 
-   ```bash
-   pnpm create next-app --example with-supabase with-supabase-app
-   ```
+```powershell
+npm run build
+npm start
+```
 
-3. Use `cd` to change into the app's directory
+---
 
-   ```bash
-   cd with-supabase-app
-   ```
+## 3) Architecture (schéma)
 
-4. Rename `.env.example` to `.env.local` and update the following:
+ASCII diagramme simple :
 
-  ```env
-  NEXT_PUBLIC_SUPABASE_URL=[INSERT SUPABASE PROJECT URL]
-  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=[INSERT SUPABASE PROJECT API PUBLISHABLE OR ANON KEY]
-  ```
-  > [!NOTE]
-  > This example uses `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, which refers to Supabase's new **publishable** key format.
-  > Both legacy **anon** keys and new **publishable** keys can be used with this variable name during the transition period. Supabase's dashboard may show `NEXT_PUBLIC_SUPABASE_ANON_KEY`; its value can be used in this example.
-  > See the [full announcement](https://github.com/orgs/supabase/discussions/29260) for more information.
+```
+                           +----------------+
+                           |   Utilisateur  |
+                                   |
+                                   v
+                             Next.js (UI)
+                           /      |       \
+                          v       v        v
+                Supabase Realtime  API   Server Actions
+                     |               |        |
+                     v               v        v
+                 Postgres <--- Prisma Client <-- Inngest Workers
+```
 
-  Both `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` can be found in [your Supabase project's API settings](https://supabase.com/dashboard/project/_?showConnect=true)
+- Frontend : composants React (mix `use client` / server components)
+- Supabase : Realtime pour `postgres_changes` sur la table `videos`
+- Prisma : modèle et client pour Postgres
+- Inngest : pipelines asynchrones pour ingestion/processing
+- Youtube-transcript-plus : récupère les caption autogénérés des vidéos youtube
+- Zeroentropy : Embedding, Vector Store, Indexer pour la KB
 
-5. You can now run the Next.js local development server:
+---
 
-   ```bash
-   npm run dev
-   ```
+## 4) Design decisions & trade-offs
 
-   The starter kit should now be running on [localhost:3000](http://localhost:3000/).
+- Realtime via Supabase Postgres Changes
+  - Avantage : faible latence, RLS respectée, facile à intégrer côté client
+  - Trade-off : payloads peuvent être partiels — on choisit de fetcher la row complète côté client pour garantir la cohérence
 
-6. This template comes with the default shadcn/ui style initialized. If you instead want other ui.shadcn styles, delete `components.json` and [re-install shadcn/ui](https://ui.shadcn.com/docs/installation/next)
+- Prisma + Postgres
+  - Avantage : modèle de données typé, migrations contrôlées
+  - Trade-off : nécessité d'une migration et d'une base en dev, plus lourd qu'un stockage NoSQL simple
 
-> Check out [the docs for Local Development](https://supabase.com/docs/guides/getting-started/local-development) to also run Supabase locally.
+- Inngest pour ingestion
+  - Avantage : workflows robustes, réessayable, visibilité sur les étapes
+  - Trade-off : complexité opérationnelle supplémentaire (monitoring, triggers)
 
-## Feedback and issues
+- Next.js App Router + Server Actions
+  - Avantage : séparation nette server/client, possibilités de SSR et actions server
+  - Trade-off : nécessité de bien gérer où instancier le client Supabase (server vs client) pour éviter fuites de clés
 
-Please file feedback and issues over on the [Supabase GitHub org](https://github.com/supabase/supabase/issues/new/choose).
+---
 
-## More Supabase examples
+## 5) Retrieval / scoping approach (approche de recherche)
 
-- [Next.js Subscription Payments Starter](https://github.com/vercel/nextjs-subscription-payments)
-- [Cookie-based Auth and the Next.js 13 App Router (free course)](https://youtube.com/playlist?list=PL5S4mPUpp4OtMhpnp93EFSo42iQ40XjbF)
-- [Supabase Auth and the Next.js App Router](https://github.com/supabase/supabase/tree/master/examples/auth/nextjs)
+- Indexation
+  - Lors de l'ingestion, on stocke : metadata (title, channel, thumbnail, duration), transcription découpée en segments, embeddings par segment (optionnel)
+
+- Recherche
+  - Étape 1 : filtrage scope (ex : canal, période, tags) côté DB via Prisma/Supabase
+  - Étape 2 : recherche sémantique (embedding similarity) sur les segments pertinents
+  - Étape 3 : récupération des segments les plus pertinents et re-ranking simple (TF-IDF ou heuristique temporelle)
+
+- Scoping
+  - UI expose filtres (channel, date, statut). Ces filtres restreignent d'abord les candidats avant d'appliquer la recherche sémantique pour réduire coût et bruit.
+
+---
+
+## 6) Known limitations & next steps
+
+Limitations actuelles
+- app absolument pas fonctionnelle : il manque la grande majorité des outils !!!!!!
+ 
+L'UI/ UX est presque en place et l'interface peut être utilisé, il faut brancher les services derrières. 
+
+
+## 7) Resources & fichiers clés
+
+- `prisma/schema.prisma` — schéma DB
+- `components/kb/knowledge-base-panel.tsx` — affichage vidéos + subscription realtime
+- `components/chat/center-chat.tsx` — chat demo + composer
+- `app/actions/ingest.ts` — server action pour ingestion
+- `app/api/ingest/route.ts` — API route proxy pour soumettre URL
+
+---
