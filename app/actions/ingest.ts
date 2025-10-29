@@ -43,7 +43,6 @@ function extractYoutubeId(url: string): string | null {
 }
 
 export async function addYoutubeContent(
-  _previousState: any,
   formData: FormData,
 ): Promise<ActionResult> {
   const rawUrl = String(formData.get("url") ?? "").trim();
@@ -163,6 +162,16 @@ export async function addYoutubeContent(
   // ---- 6. Persist to DB ----
   let newVideo;
   try {
+    // If a video with the same youtubeId already exists, return early to avoid unique constraint failures
+    try {
+      const existing = await prisma.video.findUnique({ where: { youtubeId } });
+      if (existing) {
+        console.log("[Server Action] Video already exists in DB:", existing.id);
+        return { message: "Video already queued.", error: true };
+      }
+    } catch (findErr) {
+      console.warn("[Server Action] could not check existing video (proceeding to create)", findErr);
+    }
     newVideo = await prisma.video.create({
       data: {
         youtubeId,
