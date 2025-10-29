@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import { useFormStatus } from "react-dom";
 import { createClient as createSupabaseClient} from "@/lib/supabase/client";
 import { addYoutubeContent } from "@/app/actions/ingest";
@@ -52,7 +53,7 @@ function FormFeedback({ message, submitting }: { message?: string; submitting?: 
 
 const statusCopy: Record<
   Status,
-  { label: string; badgeVariant: "default" | "secondary" | "outline" | "destructive"; icon?: JSX.Element }
+  { label: string; badgeVariant: "default" | "secondary" | "outline" | "destructive"; icon?: ReactNode }
 > = {
   queued: {
     label: "Queued",
@@ -271,7 +272,7 @@ export default function KnowledgeBasePanel() {
         console.log("[Realtime fallback] no realtime events; polling latest videos");
         try {
           const { data, error } = await supabase
-            .from("video")
+            .from("videos")
             .select("*")
             .order("created_at", { ascending: false });
           if (!error && data) {
