@@ -1,27 +1,42 @@
 {
   "prisma": {
-    "docs": "https://www.prisma.io/docs",
+    "docs": "https://context7.com/prisma/prisma/llms.txt",
     "focus": ["orm/prisma-client", "concepts/components/relations", "orm/prisma-schema"],
     "summary": "ORM TypeScript. Définition du schema, relations, génération de client."
   },
   "supabase": {
-    "docs": "https://supabase.com/docs",
+    "docs": "https://context7.com/supabase/supabase/llms.txt",
     "focus": ["guides/auth/server-side", "reference/javascript/auth-signin", "guides/realtime/quickstart"],
     "summary": "Auth SSR, Postgres managé, Realtime par canaux."
   },
   "inngest": {
-    "docs": "https://www.inngest.com/docs",
+    "docs": "https://context7.com/websites/inngest/llms.txt",
     "focus": ["functions", "events", "steps", "retries"],
     "summary": "Workflows asynchrones avec steps reprenables et gestion des retries."
   },
   "zeroentropy": {
-    "docs": "https://zeroentropy.ai/docs",
+    "docs": "https://context7.com/websites/zeroentropy_dev/llms.txt",
     "focus": ["embeddings", "vector-search", "metadata-filtering", "reranking"],
     "summary": "Embeddings, recherche vectorielle, filtrage par metadata et rerank."
   },
   "vercel_ai_sdk": {
-    "docs": "https://sdk.vercel.ai/docs",
+    "docs": "https://context7.com/vercel/ai/llms.txt",
     "focus": ["guides/nextjs", "responses/streaming", "tools"],
     "summary": "Streaming des réponses IA pour Next.js via handlers dédiés."
+  },
+  "tailwindcss": {
+    "docs": "https://context7.com/websites/tailwindcss/llms.txt",
+    "focus": ["utility-first", "responsive-design", "customization"],
+    "summary": "Framework CSS utilitaire pour un design réactif et personnalisable."
+  },
+  "shadcn_ui": {
+    "docs": "https://context7.com/websites/ui_shadcn/llms.txt",
+    "focus": ["components", "design-system", "theming"],
+    "summary": "Bibliothèque de composants UI pour des applications React."
+  },
+  "supabase_realtime": {
+    "docs": "https://context7.com/supabase/realtime/llms.txt",
+    "focus": ["realtime", "subscriptions", "database"],
+    "summary": "Fonctionnalités en temps réel pour les applications Supabase."
   }
 }

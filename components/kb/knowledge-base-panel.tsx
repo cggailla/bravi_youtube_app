@@ -1,7 +1,9 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import { useFormStatus } from "react-dom";
+import { createClient as createSupabaseClient} from "@/lib/supabase/client";
 import { addYoutubeContent } from "@/app/actions/ingest";
 import Image from "next/image";
 import { Input } from "@/components/ui/input";
@@ -20,83 +22,39 @@ import {
   Search,
 } from "lucide-react";
 
-function IngestSubmitButton({ disabled }: { disabled: boolean }) {
-  const { pending } = useFormStatus();
-  return (
-    <Button type="submit" disabled={disabled || pending} className="rounded-full shadow">
-      {pending ? "Ingesting..." : "Ingest"}
-    </Button>
-  );
-}
-
-function FormFeedback({ message }: { message?: string }) {
-  const { pending } = useFormStatus();
-  if (pending) return <p className="text-sm text-primary/100">Adding video to queue...</p>;
-  if (message) return <p className="text-sm text-primary/100">{message}</p>;
-  return null;
-}
-
+// --- Types
 type Status = "queued" | "processing" | "ready" | "failed";
 
 type VideoItem = {
   id: string;
   title: string;
-  channel: string;
-  duration: string;
-  publishedAt: string;
+  channelName: string;
+  duration?: string;
+  publishedAt?: string;
   status: Status;
-  thumbnail: string;
+  thumbnailUrl?: string;
+  youtubeId: string;
 };
 
-const dummyVideos: VideoItem[] = [
-  {
-    id: "v1",
-    title: "Mastering ZeroEntropy RAG Pipelines",
-    channel: "Bravi Labs",
-    duration: "18:42",
-    publishedAt: "Oct 20, 2025",
-    status: "ready",
-    thumbnail: "https://img.youtube.com/vi/dQw4w9WgXcQ/mqdefault.jpg",
-  },
-  {
-    id: "v2",
-    title: "Channel sync: Top 10 product launches",
-    channel: "Launch Radar",
-    duration: "12:03",
-    publishedAt: "Oct 18, 2025",
-    status: "processing",
-    thumbnail: "https://img.youtube.com/vi/lTTajzrSkCw/mqdefault.jpg",
-  },
-  {
-    id: "v3",
-    title: "Deep-dive: Supabase Auth with Prisma",
-    channel: "Fullstack Notes",
-    duration: "26:55",
-    publishedAt: "Oct 15, 2025",
-    status: "queued",
-    thumbnail: "https://img.youtube.com/vi/E7wJTI-1dvQ/mqdefault.jpg",
-  },
-  {
-    id: "v4",
-    title: "Workshop replay: Inngest for async ingestion",
-    channel: "Inngest",
-    duration: "44:10",
-    publishedAt: "Oct 11, 2025",
-    status: "failed",
-    thumbnail: "https://img.youtube.com/vi/9bZkp7q19f0/mqdefault.jpg",
-  },
-  {
-    id: "v5",
-    title: "YouTube channel: AI Product Sprint (last 10 videos)",
-    channel: "AI Product Sprint",
-    duration: "Batch",
-    publishedAt: "Oct 01, 2025",
-    status: "ready",
-    thumbnail: "https://img.youtube.com/vi/tAGnKpE4NCI/mqdefault.jpg",
-  },
-];
+// --- UI helpers
+function IngestSubmitButton({ disabled, submitting }: { disabled: boolean; submitting: boolean }) {
+  return (
+    <Button type="submit" disabled={disabled || submitting} className="rounded-full shadow">
+      {submitting ? "Ingesting..." : "Ingest"}
+    </Button>
+  );
+}
 
-const statusCopy: Record<Status, { label: string; badgeVariant: "default" | "secondary" | "outline" | "destructive"; icon?: JSX.Element }> = {
+function FormFeedback({ message, submitting }: { message?: string; submitting?: boolean }) {
+  if (submitting) return <p className="text-sm text-primary/100">Adding video to queue...</p>;
+  if (message) return <p className="text-sm text-primary/100">{message}</p>;
+  return null;
+}
+
+const statusCopy: Record<
+  Status,
+  { label: string; badgeVariant: "default" | "secondary" | "outline" | "destructive"; icon?: ReactNode }
+> = {
   queued: {
     label: "Queued",
     badgeVariant: "secondary",
@@ -133,39 +91,236 @@ const statusLabels: Record<Status, string> = {
   failed: "Failed",
 };
 
+// --- Main component
 export default function KnowledgeBasePanel() {
+  const [videos, setVideos] = useState<VideoItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
   const [pasteValue, setPasteValue] = useState("");
 
-  // Server Action wiring with useActionState
   type FormState = { message: string; error?: boolean };
   const initialFormState: FormState = { message: "" };
-  const [formState, formAction] = useActionState(addYoutubeContent, initialFormState);
-  useEffect(() => {
-    if (formState?.message) {
-      console.log("[KB][FormState]", formState);
+  // create a browser Supabase client for this client component
+  const supabase = createSupabaseClient();
+
+  // use local state for form feedback. The form's action is the server action `addYoutubeContent`.
+  const [formState, setFormState] = useState<FormState>(initialFormState);
+  const formAction = addYoutubeContent;
+  const [submitting, setSubmitting] = useState(false);
+
+  // submit via API route so we can show the response message in the UI
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setSubmitting(true);
+    setFormState(initialFormState);
+    try {
+      const res = await fetch('/api/ingest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ url: pasteValue }),
+      });
+      const json = await res.json();
+      setFormState({ message: String(json?.message ?? ''), error: Boolean(json?.error) });
+      if (!json?.error) {
+        setPasteValue('');
+      }
+    } catch (err) {
+      console.error('[Client] ingest submit failed', err);
+      setFormState({ message: 'Failed to submit', error: true });
+    } finally {
+      setSubmitting(false);
     }
-  }, [formState]);
+  }
+
+  // --- Helpers: normalize DB rows (snake_case) to VideoItem expected by UI
+  function mapStatus(dbStatus?: string): Status {
+    if (!dbStatus) return "queued";
+    const s = dbStatus.toString().toLowerCase();
+    if (s.includes("queued")) return "queued";
+    if (s.includes("process")) return "processing";
+    if (s.includes("ready")) return "ready";
+    if (s.includes("fail")) return "failed";
+    return "queued";
+  }
+
+  function formatDuration(seconds?: number | null) {
+    if (!seconds && seconds !== 0) return undefined;
+    const s = Number(seconds) || 0;
+    const mins = Math.floor(s / 60);
+    const secs = s % 60;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+  }
+
+  function normalizeVideo(row: any): VideoItem {
+    // defensive getters: try multiple key variants
+    const get = (obj: any, ...keys: string[]) => {
+      for (const k of keys) {
+        if (obj == null) continue;
+        if (k in obj && obj[k] !== undefined && obj[k] !== null) return obj[k];
+        // also try lowercase key
+        const lk = k.toLowerCase();
+        if (lk in obj && obj[lk] !== undefined && obj[lk] !== null) return obj[lk];
+      }
+      return undefined;
+    };
+
+    const youtubeId = String(get(row, 'youtube_id', 'youtubeId', 'youtubeid', 'youtube_id_raw') ?? '').trim();
+    const title = String(get(row, 'title', 'name', 'video_title') ?? (youtubeId ? `YouTube ${youtubeId}` : 'Untitled'));
+    const channelName = String(get(row, 'channel_name', 'channelName', 'channel') ?? 'Unknown');
+    const thumbnailUrlRaw = get(row, 'thumbnail_url', 'thumbnailUrl', 'thumbnail');
+    const thumbnailUrl = thumbnailUrlRaw
+      ? String(thumbnailUrlRaw)
+      : youtubeId
+      ? `https://img.youtube.com/vi/${youtubeId}/mqdefault.jpg`
+      : undefined;
+    const durationSeconds = get(row, 'duration', 'duration_seconds', 'durationSeconds');
+    const duration = formatDuration(durationSeconds ?? null);
+    const publishedAt = get(row, 'created_at', 'createdAt', 'published_at', 'publishedAt');
+    const normalized: VideoItem = {
+      id: String(get(row, 'id', 'video_id') ?? ''),
+      title,
+      channelName,
+      duration,
+      publishedAt: publishedAt ? new Date(publishedAt).toISOString() : undefined,
+      status: mapStatus(String(get(row, 'status') ?? 'queued')),
+      thumbnailUrl: thumbnailUrl ?? undefined,
+      youtubeId: youtubeId ?? '',
+    };
+
+    // debug log to help trace missing fields (will appear in browser console)
+    try {
+      // eslint-disable-next-line no-console
+      console.debug('[KB] normalizeVideo input:', row, 'normalized:', normalized);
+    } catch (err) {}
+
+    return normalized;
+  }
+
+  // --- Load initial videos + subscribe to realtime updates
+  useEffect(() => {
+    async function loadVideos() {
+      const { data, error } = await supabase
+        .from("videos")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (!error && data) {
+        setVideos((data as any[]).map(normalizeVideo));
+      }
+      setLoading(false);
+    }
+
+    loadVideos();
+    // realtime subscription with a polling fallback
+    let lastRealtimeEvent = Date.now();
+
+    const channel = supabase
+      .channel("videos-updates")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "videos" },
+        async (payload) => {
+          console.log("[Realtime] video change:", payload);
+          lastRealtimeEvent = Date.now();
+          try {
+            if (payload.eventType === "INSERT" || payload.eventType === "UPDATE") {
+              // fetch fresh row from DB to ensure we have all fields in the same shape
+              const id = payload.new?.id ?? payload.new?.video_id ?? null;
+              const youtube_id = payload.new?.youtube_id ?? payload.new?.youtubeId ?? null;
+              let freshRow = null;
+              try {
+                if (id) {
+                  const { data: single, error: singleErr } = await supabase.from('videos').select('*').eq('id', id).single();
+                  if (!singleErr && single) freshRow = single;
+                }
+                if (!freshRow && youtube_id) {
+                  const { data: byYt, error: byYtErr } = await supabase.from('videos').select('*').eq('youtube_id', youtube_id).limit(1);
+                  if (!byYtErr && Array.isArray(byYt) && byYt.length) freshRow = byYt[0];
+                }
+              } catch (fetchErr) {
+                console.warn('[Realtime] failed to fetch fresh row', fetchErr);
+              }
+
+              if (freshRow) {
+                setVideos((prev) => {
+                  if (payload.eventType === 'INSERT') return [normalizeVideo(freshRow), ...prev];
+                  return prev.map((v) => (v.id === String(freshRow.id) ? normalizeVideo(freshRow) : v));
+                });
+              } else {
+                // fallback: try to normalize payload.new directly
+                setVideos((prev) => {
+                  if (payload.eventType === 'INSERT') return [normalizeVideo(payload.new), ...prev];
+                  return prev.map((v) => (v.id === String(payload.new?.id ?? payload.new?.video_id) ? normalizeVideo(payload.new) : v));
+                });
+              }
+            } else if (payload.eventType === "DELETE") {
+              setVideos((prev) => prev.filter((v) => v.id !== String(payload.old?.id ?? payload.old?.video_id)));
+            }
+          } catch (err) {
+            console.error("[Realtime] error applying payload", err);
+          }
+        },
+      )
+      .subscribe();
+
+    // polling fallback: if no realtime event received for 15s, refresh list
+    const POLL_MS = 15000;
+    const pollInterval = setInterval(async () => {
+      if (Date.now() - lastRealtimeEvent > POLL_MS) {
+        console.log("[Realtime fallback] no realtime events; polling latest videos");
+        try {
+          const { data, error } = await supabase
+            .from("videos")
+            .select("*")
+            .order("created_at", { ascending: false });
+          if (!error && data) {
+            setVideos((data as any[]).map(normalizeVideo));
+            lastRealtimeEvent = Date.now();
+          }
+        } catch (err) {
+          console.error("[Realtime fallback] polling failed", err);
+        }
+      }
+    }, POLL_MS);
+
+    return () => {
+      clearInterval(pollInterval);
+      try {
+        supabase.removeChannel(channel);
+      } catch (err) {
+        // some supabase clients throw on removeChannel if already removed
+      }
+    };
+  }, []);
+
+  // --- Format / filter / group
+  const formattedVideos = useMemo(() => {
+    return videos.map((v) => ({
+      ...v,
+      publishedAt: v.publishedAt
+        ? new Date(v.publishedAt).toLocaleDateString(undefined, {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+          })
+        : "—",
+      thumbnailUrl: v.thumbnailUrl || `https://img.youtube.com/vi/${v.youtubeId}/mqdefault.jpg`,
+    }));
+  }, [videos]);
 
   const filteredVideos = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return dummyVideos;
-    return dummyVideos.filter((video) =>
-      [video.title, video.channel].some((field) => field.toLowerCase().includes(q)),
+    if (!q) return formattedVideos;
+    return formattedVideos.filter((video) =>
+      [video.title, video.channelName].some((field) => field.toLowerCase().includes(q)),
     );
-  }, [query]);
+  }, [query, formattedVideos]);
 
   const groupedVideos = useMemo(() => {
-    const groups: Record<Status, VideoItem[]> = {
-      queued: [],
-      processing: [],
-      ready: [],
-      failed: [],
-    };
-    filteredVideos.forEach((video) => {
-      groups[video.status].push(video);
-    });
+    const groups: Record<Status, VideoItem[]> = { queued: [], processing: [], ready: [], failed: [] };
+    filteredVideos.forEach((v) => groups[v.status]?.push(v));
     return groups;
   }, [filteredVideos]);
 
@@ -183,10 +338,9 @@ export default function KnowledgeBasePanel() {
     };
   }, [groupedVideos]);
 
+  // --- Selection handlers
   function toggleSelect(id: string) {
-    setSelected((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
-    );
+    setSelected((prev) => (prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]));
   }
 
   function clearSelection() {
@@ -194,20 +348,19 @@ export default function KnowledgeBasePanel() {
   }
 
   function handleUseAsContext() {
-    // TODO: Connect to server action to scope chat to selected videos
     console.log("Use as context", selected);
   }
 
   function handleRetry(video: VideoItem) {
-    // TODO: Trigger ingestion retry via server action
     console.log("Retry ingestion", video.id);
   }
 
+  // --- Render
   return (
     <div className="flex h-full flex-1 flex-col gap-4 overflow-hidden min-h-0">
       {/* Ingestion input */}
       <div className="rounded-3xl border border-primary/25 bg-primary/10 backdrop-blur-md p-5 shadow-lg">
-        <form action={formAction} className="flex flex-col gap-2">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-2">
           <div className="flex items-center gap-3">
             <Input
               name="url"
@@ -216,9 +369,9 @@ export default function KnowledgeBasePanel() {
               onChange={(event) => setPasteValue(event.target.value)}
               className="flex-1 bg-white text-foreground"
             />
-            <IngestSubmitButton disabled={!pasteValue.trim()} />
+            <IngestSubmitButton disabled={!pasteValue.trim()} submitting={submitting} />
           </div>
-          <FormFeedback message={formState?.message} />
+          <FormFeedback message={formState?.message} submitting={submitting} />
         </form>
         <p className="mt-3 text-sm text-primary/100">
           Video URLs ingest a single video. Channel URLs ingest the latest 10 videos and queue them for processing.
@@ -275,91 +428,97 @@ export default function KnowledgeBasePanel() {
       </div>
 
       {/* Video list */}
-      <ScrollArea className="flex-1 min-h-0 rounded-2xl border border-muted bg-background/70 backdrop-blur-sm">
-        <div className="space-y-6 p-4">
-          {(["queued", "processing", "ready", "failed"] as Status[]).map((status) => {
-            const sectionVideos = groupedVideos[status];
-            if (!sectionVideos.length) return null;
-            const statusMeta = statusCopy[status];
-            return (
-              <section key={status} className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                    {statusLabels[status]}
-                  </h3>
-                  <Badge variant={statusMeta.badgeVariant} className="gap-1 capitalize">
-                    {statusMeta.icon}
-                    {sectionVideos.length}
-                  </Badge>
-                </div>
-                <div className="space-y-3">
-                  {sectionVideos.map((video) => {
-                    const isSelected = selected.includes(video.id);
-                    const statusInfo = statusCopy[video.status];
-                    return (
-                      <div
-                        key={video.id}
-                        className={`group relative flex items-start gap-4 rounded-xl border border-border/80 px-4 py-3 transition-all hover:shadow-lg ${statusBackground[video.status]}`}
-                      >
-                        <div className="pt-1">
-                          <Checkbox checked={isSelected} onCheckedChange={() => toggleSelect(video.id)} />
-                        </div>
-                        <div className="relative aspect-video w-24 overflow-hidden rounded-lg border border-border/60 shadow-sm">
-                          <Image
-                            src={video.thumbnail}
-                            alt={video.title}
-                            fill
-                            className="object-cover"
-                            sizes="180px"
-                          />
-                        </div>
-                        <div className="min-w-0 flex-1 space-y-2">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0 space-y-1">
-                              <p className="font-medium text-foreground">{video.title}</p>
-                              <p className="truncate text-sm text-muted-foreground">
-                                {video.channel} • {video.publishedAt}
-                              </p>
-                              <p className="text-xs text-muted-foreground/80">Duration: {video.duration}</p>
-                            </div>
-                            <Badge variant={statusInfo.badgeVariant} className="capitalize">
-                              {statusInfo.icon}
-                              {statusInfo.label}
-                            </Badge>
+      {loading ? (
+        <div className="flex flex-1 items-center justify-center text-muted-foreground text-sm">Loading videos...</div>
+      ) : (
+        <ScrollArea className="flex-1 min-h-0 rounded-2xl border border-muted bg-background/70 backdrop-blur-sm">
+          <div className="space-y-6 p-4">
+            {(["queued", "processing", "ready", "failed"] as Status[]).map((status) => {
+              const sectionVideos = groupedVideos[status];
+              if (!sectionVideos.length) return null;
+              const statusMeta = statusCopy[status];
+              return (
+                <section key={status} className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                      {statusLabels[status]}
+                    </h3>
+                    <Badge variant={statusMeta.badgeVariant} className="gap-1 capitalize">
+                      {statusMeta.icon}
+                      {sectionVideos.length}
+                    </Badge>
+                  </div>
+                  <div className="space-y-3">
+                    {sectionVideos.map((video) => {
+                      const isSelected = selected.includes(video.id);
+                      const statusInfo = statusCopy[video.status];
+                      return (
+                        <div
+                          key={video.id}
+                          className={`group relative flex items-start gap-4 rounded-xl border border-border/80 px-4 py-3 transition-all hover:shadow-lg ${statusBackground[video.status]}`}
+                        >
+                          <div className="pt-1">
+                            <Checkbox checked={isSelected} onCheckedChange={() => toggleSelect(video.id)} />
                           </div>
-                          {video.status === "failed" && (
-                            <div className="flex items-center gap-2 text-xs text-destructive">
-                              Ingestion failed.
-                              <Button
-                                size="xs"
-                                variant="ghost"
-                                className="gap-1"
-                                onClick={() => handleRetry(video)}
-                              >
-                                <RefreshCcw size={12} /> Retry
-                              </Button>
+                          <div className="relative aspect-video w-24 overflow-hidden rounded-lg border border-border/60 shadow-sm">
+                            <Image
+                              src={video.thumbnailUrl ?? ""}
+                              alt={video.title}
+                              fill
+                              className="object-cover"
+                              sizes="180px"
+                            />
+                          </div>
+                          <div className="min-w-0 flex-1 space-y-2">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0 space-y-1">
+                                <p className="font-medium text-foreground">{video.title}</p>
+                                <p className="truncate text-sm text-muted-foreground">
+                                  {video.channelName} • {video.publishedAt}
+                                </p>
+                                <p className="text-xs text-muted-foreground/80">
+                                  Duration: {video.duration || "—"}
+                                </p>
+                              </div>
+                              <Badge variant={statusInfo.badgeVariant} className="capitalize">
+                                {statusInfo.icon}
+                                {statusInfo.label}
+                              </Badge>
                             </div>
-                          )}
-                          {video.status === "ready" && (
-                            <div className="flex items-center gap-1 text-xs text-primary">
-                              Ready for chat context <ArrowRight size={12} />
-                            </div>
-                          )}
+                            {video.status === "failed" && (
+                              <div className="flex items-center gap-2 text-xs text-destructive">
+                                Ingestion failed.
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="gap-1"
+                                  onClick={() => handleRetry(video)}
+                                >
+                                  <RefreshCcw size={12} /> Retry
+                                </Button>
+                              </div>
+                            )}
+                            {video.status === "ready" && (
+                              <div className="flex items-center gap-1 text-xs text-primary">
+                                Ready for chat context <ArrowRight size={12} />
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </section>
-            );
-          })}
-          {filteredVideos.length === 0 && (
-            <div className="px-4 py-12 text-center text-sm text-muted-foreground">
-              No videos match “{query}”. Try another keyword.
-            </div>
-          )}
-        </div>
-      </ScrollArea>
+                      );
+                    })}
+                  </div>
+                </section>
+              );
+            })}
+            {filteredVideos.length === 0 && (
+              <div className="px-4 py-12 text-center text-sm text-muted-foreground">
+                No videos match “{query}”. Try another keyword.
+              </div>
+            )}
+          </div>
+        </ScrollArea>
+      )}
     </div>
   );
 }

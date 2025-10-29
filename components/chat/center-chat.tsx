@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,14 +10,14 @@ import { ArrowUpRight, Mic, Plus, Send, Wand2 } from "lucide-react";
 
 type Message = { id: string; role: "user" | "ai"; content: string; ts: number };
 
-function useAutosize(ref: React.RefObject<HTMLTextAreaElement>, value: string) {
+function useAutosize(ref: React.RefObject<HTMLTextAreaElement | null>, value: string) {
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
     el.style.height = "0px";
     const next = Math.min(el.scrollHeight, 6 * 24 + 16); // up to ~6 rows
     el.style.height = next + "px";
-  }, [ref, value]);
+  }, [value, ref]);
 }
 
 export function CenterChat() {
@@ -61,8 +62,8 @@ export function CenterChat() {
     }, 20);
   }
 
-  function renderInline(text: string): JSX.Element[] {
-    const parts: JSX.Element[] = [];
+  function renderInline(text: string): ReactNode[] {
+    const parts: ReactNode[] = [];
     const regex = /(\*\*[^*]+\*\*|`[^`]+`)/g;
     let lastIndex = 0; let m: RegExpExecArray | null;
     while ((m = regex.exec(text))) {
@@ -79,8 +80,8 @@ export function CenterChat() {
     return parts;
   }
 
-  function renderMarkdown(md: string) {
-    const elements: JSX.Element[] = [];
+  function renderMarkdown(md: string): ReactNode {
+    const elements: ReactNode[] = [];
     const lines = md.split(/\n/);
     let i = 0;
     while (i < lines.length) {
