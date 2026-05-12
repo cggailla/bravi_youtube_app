@@ -1,142 +1,128 @@
-# Bravi — YouTube Knowledge Base
+# 🎬 Bravi — YouTube Knowledge Base
 
-Bravi est une application qui indexe et rend consultable du contenu YouTube (métadonnées, transcriptions, embeddings) et fournit une interface réactive avec mises à jour en temps réel via Supabase.
+> Indexe du contenu YouTube (métadonnées, transcriptions, embeddings) et le rend consultable via une interface réactive temps réel.
 
-Ce README vise un utilisateur souhaitant installer l'app en local et comprendre rapidement ses choix techniques.
-
----
-
-## 1) Screenshots & GIFs
-
-Voici les layouts des deux pages majeurs de l'app : login
-
-```md
-![Login page](docs/screenshots/login-page.png)
-```
-
-et la page principale où se retrouve tout les services
-```md
-![Home page](docs/screenshots/home_page.png)
-```
+![Stack](https://img.shields.io/badge/stack-Next.js%20·%20TypeScript%20·%20Supabase%20·%20Prisma-blue)
+![Status](https://img.shields.io/badge/status-WIP%20UI%20ready-orange)
 
 ---
 
-## 2) Setup (installer et lancer en local)
+## Ce que ça fait
 
-Prérequis
-- Node.js LTS (18+ recommandé)
-- npm
-- Postgres (local ou distant)
+Bravi transforme une chaîne ou une liste de vidéos YouTube en **base de connaissances interrogeable** : transcriptions découpées en segments, embeddings vectoriels, recherche sémantique scopée, le tout avec des updates temps réel côté UI.
 
-Étapes (PowerShell)
+L'idée : tu donnes une URL, le pipeline ingère → transcrit → embed → indexe, et tu peux ensuite chatter avec ton corpus YouTube.
 
-```powershell
+---
+
+## Stack
+
+- **Frontend** — Next.js (App Router) + React + TypeScript, mix server / client components
+- **Realtime** — Supabase Postgres Changes (RLS-aware)
+- **DB** — Postgres + Prisma (modèle typé, migrations versionnées)
+- **Workers** — Inngest pour les pipelines d'ingestion async
+- **Transcription** — `youtube-transcript-plus` pour récupérer les captions auto-générés
+- **Vector store** — Zeroentropy (embeddings + indexer + KB)
+
+---
+
+## Architecture
+
+```
+                    ┌────────────────┐
+                    │   Utilisateur  │
+                    └────────┬───────┘
+                             │
+                             ▼
+                       Next.js (UI)
+                    ┌────────┼────────┐
+                    ▼        ▼        ▼
+            Supabase     API     Server Actions
+            Realtime      │           │
+                │         ▼           ▼
+                └─→  Postgres ←── Prisma Client ←── Inngest Workers
+```
+
+---
+
+## Setup local
+
+Prérequis : Node 18+, npm, Postgres.
+
+```bash
 git clone https://github.com/cggailla/bravi_youtube_app.git
 cd bravi_youtube_app
 npm install
 
-# Créez .env.local (voir exemple ci-dessous)
+# Crée .env.local (voir ci-dessous)
 npx prisma generate
 npx prisma migrate dev --name init
 npm run dev
 ```
 
-Exemple minimal `.env.local` (NE PAS COMMIT)
+`.env.local` minimal (à NE PAS commit) :
 
 ```
 DATABASE_URL="postgresql://user:pass@localhost:5432/bravi"
 NEXT_PUBLIC_SUPABASE_URL="https://<project-ref>.supabase.co"
 NEXT_PUBLIC_SUPABASE_ANON_KEY="<anon-key>"
-SUPABASE_SERVICE_ROLE_KEY="<service-role-key>" # serveur seulement
+SUPABASE_SERVICE_ROLE_KEY="<service-role-key>"   # server-only
 ```
 
-Ouvrir http://localhost:3000
+Build prod :
 
-Build production
-
-```powershell
+```bash
 npm run build
 npm start
 ```
 
 ---
 
-## 3) Architecture (schéma)
+## Approche retrieval & scoping
 
-ASCII diagramme simple :
+Plutôt que de balancer toute la KB dans une recherche sémantique brute, le pipeline est en **3 étapes** pour limiter coût et bruit :
 
-```
-                           +----------------+
-                           |   Utilisateur  |
-                                   |
-                                   v
-                             Next.js (UI)
-                           /      |       \
-                          v       v        v
-                Supabase Realtime  API   Server Actions
-                     |               |        |
-                     v               v        v
-                 Postgres <--- Prisma Client <-- Inngest Workers
-```
-
-- Frontend : composants React (mix `use client` / server components)
-- Supabase : Realtime pour `postgres_changes` sur la table `videos`
-- Prisma : modèle et client pour Postgres
-- Inngest : pipelines asynchrones pour ingestion/processing
-- Youtube-transcript-plus : récupère les caption autogénérés des vidéos youtube
-- Zeroentropy : Embedding, Vector Store, Indexer pour la KB
+1. **Scope filter** (DB) — channel, période, tags → restreint les candidats via Prisma/Supabase
+2. **Semantic search** — similarité par embedding sur les segments restants
+3. **Re-ranking** — heuristique simple (TF-IDF + signal temporel) pour remonter les segments les plus pertinents
 
 ---
 
-## 4) Design decisions & trade-offs
+## Design decisions
 
-- Realtime via Supabase Postgres Changes
-  - Avantage : faible latence, RLS respectée, facile à intégrer côté client
-  - Trade-off : payloads peuvent être partiels — on choisit de fetcher la row complète côté client pour garantir la cohérence
-
-- Prisma + Postgres
-  - Avantage : modèle de données typé, migrations contrôlées
-  - Trade-off : nécessité d'une migration et d'une base en dev, plus lourd qu'un stockage NoSQL simple
-
-- Inngest pour ingestion
-  - Avantage : workflows robustes, réessayable, visibilité sur les étapes
-  - Trade-off : complexité opérationnelle supplémentaire (monitoring, triggers)
-
-- Next.js App Router + Server Actions
-  - Avantage : séparation nette server/client, possibilités de SSR et actions server
-  - Trade-off : nécessité de bien gérer où instancier le client Supabase (server vs client) pour éviter fuites de clés
+| Choix | Pourquoi | Trade-off |
+|---|---|---|
+| Realtime via Supabase Postgres Changes | Faible latence, RLS gratuite | Payloads partiels → on refetch la row complète côté client |
+| Prisma + Postgres | Modèle typé, migrations contrôlées | Plus lourd qu'un NoSQL pour démarrer |
+| Inngest pour l'ingestion | Workflows réessayables, observables | Complexité opérationnelle (monitoring, triggers) |
+| Next.js App Router + Server Actions | Séparation server/client nette | Faut bien gérer où instancier le client Supabase pour éviter de leak les service keys |
 
 ---
 
-## 5) Retrieval / scoping approach (approche de recherche)
+## État actuel
 
-- Indexation
-  - Lors de l'ingestion, on stocke : metadata (title, channel, thumbnail, duration), transcription découpée en segments, embeddings par segment (optionnel)
+UI / UX en place et utilisable, mais **les services backend ne sont pas encore branchés**. Le squelette est là (composants, schéma DB, routes API, server actions), il reste à connecter les pipelines d'ingestion réels et le vector store.
 
-- Recherche
-  - Étape 1 : filtrage scope (ex : canal, période, tags) côté DB via Prisma/Supabase
-  - Étape 2 : recherche sémantique (embedding similarity) sur les segments pertinents
-  - Étape 3 : récupération des segments les plus pertinents et re-ranking simple (TF-IDF ou heuristique temporelle)
+### Next steps
 
-- Scoping
-  - UI expose filtres (channel, date, statut). Ces filtres restreignent d'abord les candidats avant d'appliquer la recherche sémantique pour réduire coût et bruit.
+- [ ] Brancher Inngest sur la pipeline complète (ingest → transcript → embed)
+- [ ] Intégrer Zeroentropy côté retrieval
+- [ ] Auth Supabase complète + RLS sur toutes les tables
+- [ ] Tests E2E sur le flow d'ingestion
 
 ---
 
-## 6) Known limitations & next steps
-
-Limitations actuelles
-- app absolument pas fonctionnelle : il manque la grande majorité des outils !!!!!!
- 
-L'UI/ UX est presque en place et l'interface peut être utilisé, il faut brancher les services derrières. 
-
-
-## 7) Resources & fichiers clés
+## Fichiers clés
 
 - `prisma/schema.prisma` — schéma DB
-- `components/kb/knowledge-base-panel.tsx` — affichage vidéos + subscription realtime
-- `components/chat/center-chat.tsx` — chat demo + composer
-- `app/actions/ingest.ts` — server action pour ingestion
-- `app/api/ingest/route.ts` — API route proxy pour soumettre URL
+- `components/kb/knowledge-base-panel.tsx` — liste vidéos + subscription realtime
+- `components/chat/center-chat.tsx` — chat UI + composer
+- `app/actions/ingest.ts` — server action d'ingestion
+- `app/api/ingest/route.ts` — route API proxy pour soumettre une URL
 
 ---
+
+## Author
+
+**Côme Gaillard** — LLM Engineer @ Artefact · cofounder @ EstuIA
+[LinkedIn](https://www.linkedin.com/in/comegaillard) · comegaillard@gmail.com
